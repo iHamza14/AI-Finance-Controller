@@ -8,7 +8,7 @@ from src.ingest import ingest_data
 from src.features import generate_candidate_pairs, compute_features
 from src.model import DummyModel
 from src.store import Store
-from src.agent.exception_agent import resolve_exception
+from core.agent.exception_agent import resolve_exception
 from src.report import generate_report
 
 def main():
