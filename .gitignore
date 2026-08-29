@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
+
+# Database
+*.duckdb
+
+# Generated outputs
+outputs/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
