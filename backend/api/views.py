@@ -1,3 +1,4 @@
+from django.views.generic import TemplateView
 import os
 import uuid
 from rest_framework.views import APIView
@@ -39,3 +40,7 @@ class JobStatusView(APIView):
             return Response(ReconciliationJobSerializer(job).data)
         except ReconciliationJob.DoesNotExist:
             return Response({"error": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class DashboardView(TemplateView):
+    template_name = "api/dashboard.html"

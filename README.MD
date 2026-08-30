@@ -4,21 +4,21 @@ An intelligent, full-stack multi-source financial reconciliation engine. This to
 
 ## 🚀 Tech Stack
 
-- **Frontend:** Next.js, React, Tailwind CSS, Framer Motion, Lucide React
+- **Frontend:** Django Templates, Vanilla JS, Tailwind CSS (via CDN)
 - **Backend:** Django REST Framework, Celery
 - **Data & ML Core:** Pandas, Scikit-Learn, XGBoost, DuckDB
-- **AI Agent:** LangGraph, Langchain (Groq/OpenAI)
+- **AI Agent:** Batch Processing with Gemini (gemini-3.6-flash)
 - **Infrastructure:** Docker, PostgreSQL, Redis, `uv` (Dependency Management)
 
 ## 📁 Project Structure
 
 ```text
 ai-finance-controller/
-├── frontend/             # Next.js React Dashboard (Sleek UI)
-├── backend/              # Django REST API & Celery Tasks
-│   └── api/              # API endpoints, models, serializers, and tasks
-├── core/                 # The ML & AI Agent Engine (Independent of web framework)
-│   ├── agent/            # LangGraph exception triage agent
+├── backend/              # Django Web Server (API, Templates, Celery Tasks)
+│   ├── api/              
+│   │   ├── templates/api/dashboard.html  # Frontend UI
+│   │   └── tasks.py                      # Celery workers
+├── core/                 # The ML Engine
 │   ├── features.py       # Vectorized feature engineering
 │   └── ml_pipeline.py    # Pairwise matching pipeline
 ├── data/                 # Ephemeral storage for file uploads
@@ -29,15 +29,14 @@ ai-finance-controller/
 
 ## 🛠 Getting Started (Docker - Recommended)
 
-The easiest way to run the entire stack (Postgres, Redis, Celery, Django API, and Next.js Frontend) is via Docker Compose.
+The easiest way to run the entire stack (Postgres, Redis, Celery, and Django) is via Docker Compose.
 
 1. Ensure Docker Desktop is running.
 2. Run the following command from the root directory:
    ```bash
    docker compose up --build
    ```
-3. Access the Frontend Dashboard at [http://localhost:3000](http://localhost:3000).
-4. *(The Backend API runs on `http://localhost:8000`)*.
+3. Access the Dashboard at [http://localhost:8000](http://localhost:8000).
 
 ## 💻 Getting Started (Local Native Dev)
 
@@ -49,31 +48,23 @@ uv sync
 ```
 
 **2. Start Redis**
-Ensure you have Redis running locally (e.g., `brew services start redis`).
+Ensure you have Redis running locally.
 
-**3. Start the Django API**
+**3. Start the Django Server**
 ```bash
 cd backend
-uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
 **4. Start the Celery Worker (In a new terminal)**
 ```bash
 cd backend
-uv run celery -A finance_backend worker -l info
-```
-
-**5. Start the Frontend (In a new terminal)**
-```bash
-cd frontend
-npm install
-npm run dev
+OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run celery -A finance_backend worker -l info
 ```
 
 ## 🧠 How It Works
-1. **Upload:** User drops 3 CSVs (Bank, GL, Invoices) into the sleek frontend dashboard.
-2. **Ingest:** Files are sent to the Django `/api/reconcile/start/` endpoint, returning a Job UUID.
-3. **Machine Learning:** Celery spins up a background worker, loading the data into pandas and evaluating candidate matches using the pre-trained XGBoost model.
-4. **Agent Triage:** Transactions scoring below the confidence threshold fall through to the LangGraph AI agent, which queries the DuckDB ledger to write an investigation report.
-5. **Report:** The frontend polls the Django API, fetching the completed `ReconciliationReport` JSON from Postgres, displaying match rates and the exception list beautifully.
+1. **Upload:** User drops 3 CSVs (Bank, GL, Invoices) into the Django HTML dashboard at `localhost:8000`.
+2. **Ingest:** Files are sent to the Django `/api/reconcile/start/` REST endpoint.
+3. **Machine Learning:** Celery spins up a background worker, evaluates candidate matches using the pre-trained XGBoost model.
+4. **Agent Triage (Batch Mode):** Anomalies fall through to a batch processor, which pre-fetches ledger context via DuckDB and sends a single, lightning-fast API request to Gemini 3.6 to generate triage verdicts.
+5. **Report:** The Vanilla JS frontend polls the Django API, fetching the `ReconciliationReport` JSON from Postgres, displaying it beautifully.
