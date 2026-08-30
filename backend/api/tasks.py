@@ -21,7 +21,6 @@ sys.path.append(PROJECT_ROOT)
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 from core.ml_pipeline import run_ml_core
-from core.agent.exception_agent import resolve_exception
 from src.store import Store 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +129,30 @@ Transactions to triage:
                     ex["reason"] = f"Batch API failed: {str(e)}"
                     exceptions_list.append(ex)
         
+        # Generate final_results.csv
+        try:
+            frames = []
+            if confirmed_pairs:
+                df_conf = pd.DataFrame(confirmed_pairs)
+                df_conf['status'] = 'MATCHED'
+                df_conf['reason'] = 'ML Auto-Matched'
+                frames.append(df_conf[['txn_id', 'entry_id', 'status', 'reason']])
+            if exceptions_list:
+                df_ex = pd.DataFrame(exceptions_list)
+                if 'agent_verdict' in df_ex.columns:
+                    df_ex['status'] = df_ex['agent_verdict']
+                else:
+                    df_ex['status'] = 'NEEDS_HUMAN'
+                df_ex['entry_id'] = ''
+                if 'reason' not in df_ex.columns:
+                    df_ex['reason'] = ''
+                frames.append(df_ex[['txn_id', 'entry_id', 'status', 'reason']])
+            if frames:
+                pd.concat(frames, ignore_index=True).to_csv(os.path.join(data_dir, 'final_results.csv'), index=False)
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to save CSV: {e}")
+
         match_rate = len(confirmed_pairs) / len(df_bank) if len(df_bank) > 0 else 0
         exception_rate = len(df_exceptions) / len(df_bank) if len(df_bank) > 0 else 0
 
