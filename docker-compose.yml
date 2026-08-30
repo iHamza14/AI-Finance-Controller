@@ -1,0 +1,81 @@
+name: ai-finance-controller
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: finance_db
+      POSTGRES_USER: finance_user
+      POSTGRES_PASSWORD: finance_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_user -d finance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      # Uncomment below when switching Django from SQLite to Postgres
+      - DATABASE_URL=postgres://finance_user:finance_password@db:5432/finance_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "pip install uv && 
+             uv sync && 
+             cd backend && 
+             uv run python manage.py migrate && 
+             uv run python manage.py runserver 0.0.0.0:8000"
+
+  celery:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      # Uncomment below when switching Django from SQLite to Postgres
+      - DATABASE_URL=postgres://finance_user:finance_password@db:5432/finance_db
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "pip install uv && 
+             uv sync && 
+             cd backend && 
+             uv run celery -A finance_backend worker -l info"
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev"
+
+volumes:
+  pg_data:

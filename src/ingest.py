@@ -1,5 +1,5 @@
-import os
 import pandas as pd
+import os
 
 def ingest_data(data_dir="data"):
     """
