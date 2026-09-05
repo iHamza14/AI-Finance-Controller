@@ -4,7 +4,7 @@ import pandas as pd
 FEATURE_COLS = [
     'amount_diff', 'amount_ratio', 'date_diff_days', 
     'desc_cosine', 'counterparty_fuzzy', 'direction_match', 
-    'has_invoice', 'invoice_amount_diff'
+    'has_invoice', 'invoice_amount_diff', 'bank_dup_count'
 ]
 
 def load_model(model_path):

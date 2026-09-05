@@ -4,28 +4,49 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from rapidfuzz import fuzz
 
 def build_features(df_bank, df_gl, df_invoices):
+    # Convert to datetime vectors once
     df_bank['date'] = pd.to_datetime(df_bank['date'])
     df_gl['date'] = pd.to_datetime(df_gl['date'])
+
+    # Feature: Count occurrences of identical bank transactions (duplicates)
+    df_bank['bank_dup_count'] = df_bank.groupby(['amount', 'counterparty', 'date'])['amount'].transform('count')
+
+    # Perform an in-memory cross join (pushes O(N*M) loop to C)
     df_cross = df_bank.merge(df_gl, how='cross', suffixes=('_b', '_g'))
-    
+
+    # Vectorized condition checks
     date_diffs = (df_cross['date_b'] - df_cross['date_g']).dt.days.abs()
     amt_diff_pcts = (df_cross['amount_b'] - df_cross['amount_g']).abs() / np.maximum(df_cross['amount_b'], 0.01)
-    
+
+    # Apply blocking filters simultaneously
     mask = (date_diffs <= 3) & (amt_diff_pcts <= 0.05)
     df_candidates = df_cross[mask].copy().reset_index(drop=True)
-    
+
+    # Rename columns to match the expected downstream schema
     df_candidates = df_candidates.rename(columns={
-        'amount_b': 'b_amount', 'amount_g': 'g_amount',
-        'date_b': 'b_date', 'date_g': 'g_date',
-        'description': 'b_desc', 'counterparty': 'b_counterparty',
-        'memo': 'g_memo', 'vendor_id': 'g_vendor_id'
+        'amount_b': 'b_amount',
+        'amount_g': 'g_amount',
+        'date_b': 'b_date',
+        'date_g': 'g_date',
+        'description': 'b_desc',
+        'counterparty': 'b_counterparty',
+        'memo': 'g_memo',
+        'vendor_id': 'g_vendor_id'
     })
+
+    # Keep only necessary columns (Updated to retain bank_dup_count)
+    df_candidates = df_candidates[[
+        'txn_id', 'entry_id', 'b_amount', 'g_amount', 
+        'b_date', 'g_date', 'b_desc', 'b_counterparty', 
+        'g_memo', 'g_vendor_id', 'bank_dup_count'
+    ]]
     
     df_features = df_candidates[['txn_id', 'entry_id']].copy()
     df_features['amount_diff'] = (df_candidates['b_amount'] - df_candidates['g_amount']).abs()
     df_features['amount_ratio'] = np.minimum(df_candidates['b_amount'], df_candidates['g_amount']) / np.maximum(df_candidates['b_amount'], df_candidates['g_amount'])
     df_features['date_diff_days'] = (pd.to_datetime(df_candidates['b_date']) - pd.to_datetime(df_candidates['g_date'])).dt.days.abs()
     df_features['direction_match'] = 1
+    df_features['bank_dup_count'] = df_candidates['bank_dup_count']
     
     all_text = pd.concat([df_bank['description'], df_gl['memo']]).unique()
     tfidf = TfidfVectorizer().fit(all_text)
